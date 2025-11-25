@@ -232,45 +232,47 @@ const App: React.FC = () => {
                 logs={equipmentLogs}
             />
             <Header onSetView={setCurrentView} />
-
-            {isMasterUser && (
-                <div className="bg-yellow-100 border-y border-yellow-300">
-                    <div className="container mx-auto px-4 py-2 flex items-center justify-center gap-4">
-                        <span className="font-bold text-yellow-800">Painel do Administrador:</span>
-                        <button
-                            onClick={() => setRegistrationLocked(true)}
-                            disabled={isRegistrationLocked}
-                            className="bg-red-500 text-white font-semibold py-1 px-4 rounded-md hover:bg-red-600 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                            Bloquear Cadastro
-                        </button>
-                        <button
-                            onClick={() => setRegistrationLocked(false)}
-                            disabled={!isRegistrationLocked}
-                            className="bg-green-500 text-white font-semibold py-1 px-4 rounded-md hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                            Liberar Cadastro
-                        </button>
+            
+            <div className="pt-12">
+                {isMasterUser && (
+                    <div className="bg-yellow-100 border-y border-yellow-300">
+                        <div className="container mx-auto px-4 py-2 flex items-center justify-center gap-4">
+                            <span className="font-bold text-yellow-800">Painel do Administrador:</span>
+                            <button
+                                onClick={() => setRegistrationLocked(true)}
+                                disabled={isRegistrationLocked}
+                                className="bg-red-500 text-white font-semibold py-1 px-4 rounded-md hover:bg-red-600 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors text-sm"
+                            >
+                                Bloquear Cadastro
+                            </button>
+                            <button
+                                onClick={() => setRegistrationLocked(false)}
+                                disabled={!isRegistrationLocked}
+                                className="bg-green-500 text-white font-semibold py-1 px-4 rounded-md hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors text-sm"
+                            >
+                                Liberar Cadastro
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            <main className="container mx-auto px-4 py-8">
-                 <div className="text-center mb-8">
-                    <h1 className="text-3xl md:text-4xl font-bold text-estapar-dark-green">Relatório Diário PSB Bahia & Mercadão</h1>
-                    <div className="mt-2">
-                      <input 
-                        type="date" 
-                        value={selectedDate} 
-                        onChange={e => setSelectedDate(e.target.value)}
-                        className="p-2 border rounded-md shadow-sm bg-white text-gray-900 [color-scheme:light]"
-                      />
+                <main className="container mx-auto px-4 py-8">
+                     <div className="text-center mb-8">
+                        <h1 className="text-3xl md:text-4xl font-bold text-estapar-dark-green">Relatório Diário PSB Bahia & Mercadão</h1>
+                        <div className="mt-2">
+                          <input 
+                            type="date" 
+                            value={selectedDate} 
+                            onChange={e => setSelectedDate(e.target.value)}
+                            className="p-2 border rounded-md shadow-sm bg-white text-gray-900 [color-scheme:light]"
+                          />
+                        </div>
                     </div>
-                </div>
-                {renderContent()}
-                {user && changeLog.length > 0 && <ChangeLog logs={changeLog} />}
-                {user && loginHistory.length > 0 && <LoginHistory logs={loginHistory} />}
-            </main>
+                    {renderContent()}
+                    {user && changeLog.length > 0 && <ChangeLog logs={changeLog} />}
+                    {user && loginHistory.length > 0 && <LoginHistory logs={loginHistory} />}
+                </main>
+            </div>
         </div>
     );
 };

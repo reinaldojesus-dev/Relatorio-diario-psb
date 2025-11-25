@@ -1,16 +1,6 @@
-
 import React from 'react';
 import { HomeIcon } from './icons';
 import { AppView } from '../types';
-
-interface EstaparLogoProps {
-    className?: string;
-}
-
-const EstaparLogo: React.FC<EstaparLogoProps> = ({ className }) => (
-    <img src="https://storage.googleapis.com/aistudio-v2-host/prompt-artefacts/1721759021580/96116.png" alt="Estapar Logo" className={`h-10 ${className || ''}`} />
-);
-
 
 interface HeaderProps {
     onSetView: (view: AppView) => void;
@@ -18,9 +8,8 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onSetView }) => {
     return (
-        <header className="bg-estapar-dark-green shadow-lg">
-            <div className="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-                <EstaparLogo />
+        <header className="bg-estapar-dark-green shadow-lg fixed top-0 left-0 right-0 z-20">
+            <div className="px-4 sm:px-6 lg:px-8 py-3 flex justify-end items-center">
                 <button
                     onClick={() => onSetView(AppView.REPORT)}
                     className="flex items-center space-x-2 text-white hover:text-estapar-light-green transition-colors duration-200"
