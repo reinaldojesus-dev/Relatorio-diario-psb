@@ -11,7 +11,6 @@ import PreventiveList from './components/PreventiveList';
 import FilterModal from './components/FilterModal';
 import LoginHistory from './components/LoginHistory';
 
-// Mock Data
 const createInitialReportData = (): ReportData => {
   const data: ReportData = {};
   reportStructure.forEach(section => {
@@ -23,27 +22,55 @@ const createInitialReportData = (): ReportData => {
   return data;
 };
 
-const MOCK_PREVENTIVES: PreventiveMaintenance[] = [
-    { id: 'prev1', equipment: 'DOCAS - Entrada 01', date: new Date(2024, 6, 20).toISOString(), collaborator: 'Carlos Souza (carlos.souza@estapar.com.br)', photo: 'https://picsum.photos/400/300?random=1' },
-    { id: 'prev2', equipment: 'TERMINAIS - Epa Petz', date: new Date(2024, 6, 18).toISOString(), collaborator: 'Ana Pereira (ana.pereira@estapar.com.br)', photo: 'https://picsum.photos/400/300?random=2' },
-];
-
-const MOCK_LOGS: EquipmentLogEntry[] = [
-    { id: 'log1', equipment: 'DOCAS - Entrada 01', date: new Date(2024, 6, 15).toISOString(), description: 'Cancela não abre remotamente.' },
-    { id: 'log2', equipment: 'DOCAS - Entrada 01', date: new Date(2024, 5, 10).toISOString(), description: 'Leitor de ticket falhando.' },
-    { id: 'log3', equipment: 'TERMINAIS - Epa Petz', date: new Date(2024, 6, 1).toISOString(), description: 'Impressora sem papel.' },
-    { id: 'log4', equipment: 'DOCAS - Entrada 01', date: new Date(2024, 4, 20).toISOString(), description: 'Cancela não abre remotamente.' },
-];
-
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
     const [users, setUsers] = useState<User[]>([]);
-    const [reports, setReports] = useState<Report[]>([
-        { id: '1', date: new Date().toISOString(), collaborator: 'Sistema', data: createInitialReportData() }
-    ]);
-    const [currentReportData, setCurrentReportData] = useState<ReportData>(reports[0].data);
-    const [stagedReportData, setStagedReportData] = useState<ReportData>(reports[0].data);
-    const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([]);
+    
+    const [reports, setReports] = useState<Report[]>(() => {
+        try {
+            const stored = localStorage.getItem('estapar_reports');
+            return stored ? JSON.parse(stored) : [{ id: '1', date: new Date().toISOString(), collaborator: 'Sistema', data: createInitialReportData() }];
+        } catch {
+            return [{ id: '1', date: new Date().toISOString(), collaborator: 'Sistema', data: createInitialReportData() }];
+        }
+    });
+
+    const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>(() => {
+        try {
+            const stored = localStorage.getItem('estapar_changeLog');
+            return stored ? JSON.parse(stored) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    const [preventives, setPreventives] = useState<PreventiveMaintenance[]>(() => {
+        try {
+            const stored = localStorage.getItem('estapar_preventives');
+            return stored ? JSON.parse(stored) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    const [equipmentLogs, setEquipmentLogs] = useState<EquipmentLogEntry[]>(() => {
+        try {
+            const stored = localStorage.getItem('estapar_equipmentLogs');
+            return stored ? JSON.parse(stored) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    
+    const [currentReportData, setCurrentReportData] = useState<ReportData>(() => {
+        const reportForDate = reports.find(r => r.date.split('T')[0] === selectedDate);
+        return reportForDate ? reportForDate.data : createInitialReportData();
+    });
+
+    const [stagedReportData, setStagedReportData] = useState<ReportData>(currentReportData);
+
     const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>(() => {
         try {
             const storedHistory = localStorage.getItem('estapar_login_history');
@@ -52,12 +79,11 @@ const App: React.FC = () => {
             return [];
         }
     });
+
     const [currentView, setCurrentView] = useState<AppView>(AppView.REPORT);
-    const [preventives, setPreventives] = useState<PreventiveMaintenance[]>(MOCK_PREVENTIVES);
-    const [equipmentLogs, setEquipmentLogs] = useState<EquipmentLogEntry[]>(MOCK_LOGS);
     const [isLoginModalOpen, setLoginModalOpen] = useState<boolean>(true);
     const [isFilterModalOpen, setFilterModalOpen] = useState<boolean>(false);
-    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    
     const [isRegistrationLocked, setRegistrationLocked] = useState<boolean>(() => {
         try {
             const storedValue = localStorage.getItem('estapar_registration_locked');
@@ -67,13 +93,14 @@ const App: React.FC = () => {
         }
     });
 
-    useEffect(() => {
-        localStorage.setItem('estapar_registration_locked', JSON.stringify(isRegistrationLocked));
-    }, [isRegistrationLocked]);
-
-    useEffect(() => {
-        localStorage.setItem('estapar_login_history', JSON.stringify(loginHistory));
-    }, [loginHistory]);
+    // --- Data Persistence Effects ---
+    useEffect(() => { localStorage.setItem('estapar_reports', JSON.stringify(reports)); }, [reports]);
+    useEffect(() => { localStorage.setItem('estapar_changeLog', JSON.stringify(changeLog)); }, [changeLog]);
+    useEffect(() => { localStorage.setItem('estapar_preventives', JSON.stringify(preventives)); }, [preventives]);
+    useEffect(() => { localStorage.setItem('estapar_equipmentLogs', JSON.stringify(equipmentLogs)); }, [equipmentLogs]);
+    useEffect(() => { localStorage.setItem('estapar_registration_locked', JSON.stringify(isRegistrationLocked)); }, [isRegistrationLocked]);
+    useEffect(() => { localStorage.setItem('estapar_login_history', JSON.stringify(loginHistory)); }, [loginHistory]);
+    useEffect(() => { localStorage.setItem('estapar_users', JSON.stringify(users)); }, [users]);
 
      useEffect(() => {
         try {
@@ -84,7 +111,6 @@ const App: React.FC = () => {
             if (!masterUserExists) {
                 const masterUser: User = { name: 'Admin Master', email: 'admin', password: 'estaparti' };
                 usersList.push(masterUser);
-                localStorage.setItem('estapar_users', JSON.stringify(usersList));
             }
             setUsers(usersList);
 
@@ -93,10 +119,13 @@ const App: React.FC = () => {
         }
     }, []);
     
-    // Sync staged data when the main data source changes (e.g., on initial load or date change)
+    // Sync staged data when the main data source changes (e.g., on date change)
     useEffect(() => {
-        setStagedReportData(currentReportData);
-    }, [currentReportData]);
+        const reportForDate = reports.find(r => r.date.split('T')[0] === selectedDate);
+        const dataForSelectedDate = reportForDate ? reportForDate.data : createInitialReportData();
+        setCurrentReportData(dataForSelectedDate);
+        setStagedReportData(dataForSelectedDate);
+    }, [selectedDate, reports]);
 
     const handleLogin = (credentials: {email: string, password: string}) => {
         const foundUser = users.find(u => u.email === credentials.email && u.password === credentials.password);
@@ -128,9 +157,7 @@ const App: React.FC = () => {
             return;
         }
         
-        const newUsers = [...users, newUser];
-        setUsers(newUsers);
-        localStorage.setItem('estapar_users', JSON.stringify(newUsers));
+        setUsers(prev => [...prev, newUser]);
         setUser(newUser);
         setLoginModalOpen(false);
         const newLoginEntry: LoginHistoryEntry = {
@@ -205,7 +232,24 @@ const App: React.FC = () => {
             setEquipmentLogs(prev => [...newLogs, ...prev]);
         }
 
-        setCurrentReportData(stagedReportData);
+        const reportIndex = reports.findIndex(r => r.date.split('T')[0] === selectedDate);
+        let updatedReports = [...reports];
+        
+        if (reportIndex > -1) {
+            updatedReports[reportIndex] = {
+                ...updatedReports[reportIndex],
+                data: stagedReportData,
+                collaborator: user.name,
+            };
+        } else {
+            updatedReports.push({
+                id: `${Date.now()}`,
+                date: new Date(selectedDate).toISOString(),
+                collaborator: user.name,
+                data: stagedReportData
+            });
+        }
+        setReports(updatedReports);
         alert('Alterações salvas com sucesso!');
     };
 
