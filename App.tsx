@@ -10,6 +10,7 @@ import PreventiveForm from './components/PreventiveForm';
 import PreventiveList from './components/PreventiveList';
 import FilterModal from './components/FilterModal';
 import LoginHistory from './components/LoginHistory';
+import { db, auth } from './firebaseConfig';
 
 const createInitialReportData = (): ReportData => {
   const data: ReportData = {};
@@ -24,123 +25,100 @@ const createInitialReportData = (): ReportData => {
 
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
-    const [users, setUsers] = useState<User[]>(() => {
-        try {
-            const storedUsers = localStorage.getItem('estapar_users');
-            const usersList: User[] = storedUsers ? JSON.parse(storedUsers) : [];
-
-            const masterUserExists = usersList.some(u => u.email === 'admin');
-            if (!masterUserExists) {
-                usersList.push({ name: 'Admin Master', email: 'admin', password: 'estaparti' });
-            }
-            return usersList;
-        } catch (error) {
-            console.error("Failed to parse users from localStorage", error);
-            return [{ name: 'Admin Master', email: 'admin', password: 'estaparti' }];
-        }
-    });
-    
-    const [reports, setReports] = useState<Report[]>(() => {
-        try {
-            const stored = localStorage.getItem('estapar_reports');
-            return stored ? JSON.parse(stored) : [{ id: '1', date: new Date().toISOString(), collaborator: 'Sistema', data: createInitialReportData() }];
-        } catch {
-            return [{ id: '1', date: new Date().toISOString(), collaborator: 'Sistema', data: createInitialReportData() }];
-        }
-    });
-
-    const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>(() => {
-        try {
-            const stored = localStorage.getItem('estapar_changeLog');
-            return stored ? JSON.parse(stored) : [];
-        } catch {
-            return [];
-        }
-    });
-
-    const [preventives, setPreventives] = useState<PreventiveMaintenance[]>(() => {
-        try {
-            const stored = localStorage.getItem('estapar_preventives');
-            return stored ? JSON.parse(stored) : [];
-        } catch {
-            return [];
-        }
-    });
-
-    const [equipmentLogs, setEquipmentLogs] = useState<EquipmentLogEntry[]>(() => {
-        try {
-            const stored = localStorage.getItem('estapar_equipmentLogs');
-            return stored ? JSON.parse(stored) : [];
-        } catch {
-            return [];
-        }
-    });
+    const [reports, setReports] = useState<Report[]>([]);
+    const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([]);
+    const [preventives, setPreventives] = useState<PreventiveMaintenance[]>([]);
+    const [equipmentLogs, setEquipmentLogs] = useState<EquipmentLogEntry[]>([]);
+    const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>([]);
+    const [isRegistrationLocked, setRegistrationLocked] = useState<boolean>(false);
 
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-    
-    const [currentReportData, setCurrentReportData] = useState<ReportData>(() => {
-        const reportForDate = reports.find(r => r.date.split('T')[0] === selectedDate);
-        return reportForDate ? reportForDate.data : createInitialReportData();
-    });
-
-    const [stagedReportData, setStagedReportData] = useState<ReportData>(currentReportData);
-
-    const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>(() => {
-        try {
-            const storedHistory = localStorage.getItem('estapar_login_history');
-            return storedHistory ? JSON.parse(storedHistory) : [];
-        } catch {
-            return [];
-        }
-    });
+    const [currentReportData, setCurrentReportData] = useState<ReportData>(createInitialReportData());
+    const [stagedReportData, setStagedReportData] = useState<ReportData>(createInitialReportData());
 
     const [currentView, setCurrentView] = useState<AppView>(AppView.REPORT);
     const [isLoginModalOpen, setLoginModalOpen] = useState<boolean>(true);
     const [isFilterModalOpen, setFilterModalOpen] = useState<boolean>(false);
     
-    const [isRegistrationLocked, setRegistrationLocked] = useState<boolean>(() => {
-        try {
-            const storedValue = localStorage.getItem('estapar_registration_locked');
-            return storedValue ? JSON.parse(storedValue) : false;
-        } catch {
-            return false;
-        }
-    });
+    // --- Firebase Data Listeners ---
+    useEffect(() => {
+        // Auth state listener
+        const unsubscribeAuth = auth.onAuthStateChanged(firebaseUser => {
+            if (firebaseUser) {
+                setUser({ email: firebaseUser.email!, name: firebaseUser.displayName || firebaseUser.email! });
+                setLoginModalOpen(false);
+            } else {
+                setUser(null);
+                setLoginModalOpen(true);
+            }
+        });
 
-    // --- Data Persistence Effects ---
-    useEffect(() => { localStorage.setItem('estapar_reports', JSON.stringify(reports)); }, [reports]);
-    useEffect(() => { localStorage.setItem('estapar_changeLog', JSON.stringify(changeLog)); }, [changeLog]);
-    useEffect(() => { localStorage.setItem('estapar_preventives', JSON.stringify(preventives)); }, [preventives]);
-    useEffect(() => { localStorage.setItem('estapar_equipmentLogs', JSON.stringify(equipmentLogs)); }, [equipmentLogs]);
-    useEffect(() => { localStorage.setItem('estapar_registration_locked', JSON.stringify(isRegistrationLocked)); }, [isRegistrationLocked]);
-    useEffect(() => { localStorage.setItem('estapar_login_history', JSON.stringify(loginHistory)); }, [loginHistory]);
-    useEffect(() => { localStorage.setItem('estapar_users', JSON.stringify(users)); }, [users]);
+        // Firestore listeners
+        const unsubscribeReports = db.collection('reports').onSnapshot(snapshot => {
+            const reportsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report));
+            setReports(reportsData);
+        });
+
+        const unsubscribeChangeLog = db.collection('changeLog').orderBy('date', 'desc').limit(50).onSnapshot(snapshot => {
+            const logData = snapshot.docs.map(doc => doc.data() as ChangeLogEntry);
+            setChangeLog(logData);
+        });
+
+        const unsubscribePreventives = db.collection('preventives').orderBy('date', 'desc').onSnapshot(snapshot => {
+            const preventiveData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PreventiveMaintenance));
+            setPreventives(preventiveData);
+        });
+        
+        const unsubscribeEquipmentLogs = db.collection('equipmentLogs').orderBy('date', 'desc').onSnapshot(snapshot => {
+            const logData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EquipmentLogEntry));
+            setEquipmentLogs(logData);
+        });
+
+        const unsubscribeLoginHistory = db.collection('loginHistory').orderBy('date', 'desc').limit(50).onSnapshot(snapshot => {
+            const historyData = snapshot.docs.map(doc => doc.data() as LoginHistoryEntry);
+            setLoginHistory(historyData);
+        });
+
+        const unsubscribeSettings = db.collection('settings').doc('appSettings').onSnapshot(doc => {
+            if (doc.exists) {
+                setRegistrationLocked(doc.data()?.isRegistrationLocked ?? false);
+            }
+        });
+
+        return () => {
+            unsubscribeAuth();
+            unsubscribeReports();
+            unsubscribeChangeLog();
+            unsubscribePreventives();
+            unsubscribeEquipmentLogs();
+            unsubscribeLoginHistory();
+            unsubscribeSettings();
+        };
+    }, []);
     
     // Sync staged data when the main data source changes (e.g., on date change)
     useEffect(() => {
-        const reportForDate = reports.find(r => r.date.split('T')[0] === selectedDate);
+        const reportForDate = reports.find(r => r.id === selectedDate);
         const dataForSelectedDate = reportForDate ? reportForDate.data : createInitialReportData();
         setCurrentReportData(dataForSelectedDate);
         setStagedReportData(dataForSelectedDate);
     }, [selectedDate, reports]);
 
-    const handleLogin = (credentials: {email: string, password: string}) => {
-        const foundUser = users.find(u => u.email === credentials.email && u.password === credentials.password);
-        if (foundUser) {
-            setUser(foundUser);
-            setLoginModalOpen(false);
+    const handleLogin = async (credentials: {email: string, password: string}) => {
+        try {
+            await auth.signInWithEmailAndPassword(credentials.email, credentials.password);
             const newLoginEntry: LoginHistoryEntry = {
-                user: foundUser.name,
-                email: foundUser.email,
+                user: auth.currentUser?.displayName || credentials.email,
+                email: credentials.email,
                 date: new Date().toISOString(),
             };
-            setLoginHistory(prev => [newLoginEntry, ...prev].slice(0, 50));
-        } else {
+            db.collection('loginHistory').add(newLoginEntry);
+        } catch (error) {
             alert('Acesso negado. E-mail ou senha incorretos.');
         }
     };
     
-    const handleRegister = (newUser: User) => {
+    const handleRegister = async (newUser: User) => {
         if (isRegistrationLocked) {
             alert('O cadastro de novos usuários está temporariamente bloqueado pelo administrador.');
             return;
@@ -149,28 +127,30 @@ const App: React.FC = () => {
             alert('Acesso negado. Por favor, use um e-mail @estapar.com.br para se registrar.');
             return;
         }
-        if (users.some(u => u.email === newUser.email)) {
-            alert('Este e-mail já está cadastrado.');
-            return;
+        try {
+            const userCredential = await auth.createUserWithEmailAndPassword(newUser.email, newUser.password!);
+            await userCredential.user?.updateProfile({ displayName: newUser.name });
+            db.collection('users').doc(userCredential.user!.uid).set({ name: newUser.name, email: newUser.email });
+             const newLoginEntry: LoginHistoryEntry = {
+                user: newUser.name,
+                email: newUser.email,
+                date: new Date().toISOString(),
+            };
+            db.collection('loginHistory').add(newLoginEntry);
+        } catch (error: any) {
+            if (error.code === 'auth/email-already-in-use') {
+                alert('Este e-mail já está cadastrado.');
+            } else {
+                alert('Erro ao registrar. Tente novamente.');
+            }
         }
-        
-        setUsers(prev => [...prev, newUser]);
-        setUser(newUser);
-        setLoginModalOpen(false);
-        const newLoginEntry: LoginHistoryEntry = {
-            user: newUser.name,
-            email: newUser.email,
-            date: new Date().toISOString(),
-        };
-        setLoginHistory(prev => [newLoginEntry, ...prev].slice(0, 50));
     };
 
     const handleViewAsGuest = () => {
-        setUser(null);
-        setLoginModalOpen(false);
+        setLoginModalOpen(false); // Allows viewing, but user will be null
     };
     
-    const addChangeLog = useCallback((change: string) => {
+    const addChangeLog = useCallback(async (change: string) => {
         if (!user) return;
         const newEntry: ChangeLogEntry = {
             user: user.name,
@@ -178,7 +158,7 @@ const App: React.FC = () => {
             date: new Date().toISOString(),
             change,
         };
-        setChangeLog(prev => [newEntry, ...prev]);
+        await db.collection('changeLog').add(newEntry);
     }, [user]);
 
     const handleItemChange = useCallback((section: string, item: string, status: 'ok' | 'issue', observation: string) => {
@@ -194,12 +174,12 @@ const App: React.FC = () => {
         });
     }, [user]);
     
-    const handleSaveChanges = () => {
+    const handleSaveChanges = async () => {
         if (!user) {
             alert('Faça login para salvar as alterações.');
             return;
         }
-        const newLogs: EquipmentLogEntry[] = [];
+        const batch = db.batch();
 
         reportStructure.forEach(section => {
             section.items.forEach(item => {
@@ -214,54 +194,48 @@ const App: React.FC = () => {
                     addChangeLog(changeDescription);
 
                     if (newState.status === 'issue' && newState.observation && oldState.status !== 'issue') {
-                        newLogs.push({
-                            id: `log-${Date.now()}-${item}`,
+                        const newLog = {
                             equipment: `${section.title} - ${item}`,
                             date: new Date().toISOString(),
                             description: newState.observation
-                        });
+                        };
+                        const logRef = db.collection('equipmentLogs').doc();
+                        batch.set(logRef, newLog);
                     }
                 }
             });
         });
-
-        if (newLogs.length > 0) {
-            setEquipmentLogs(prev => [...newLogs, ...prev]);
-        }
-
-        const reportIndex = reports.findIndex(r => r.date.split('T')[0] === selectedDate);
-        let updatedReports = [...reports];
         
-        if (reportIndex > -1) {
-            updatedReports[reportIndex] = {
-                ...updatedReports[reportIndex],
-                data: stagedReportData,
-                collaborator: user.name,
-            };
-        } else {
-            updatedReports.push({
-                id: `${Date.now()}`,
-                date: new Date(selectedDate).toISOString(),
-                collaborator: user.name,
-                data: stagedReportData
-            });
+        const reportRef = db.collection('reports').doc(selectedDate);
+        const reportPayload: Report = {
+            id: selectedDate,
+            date: new Date(selectedDate).toISOString(),
+            collaborator: user.name,
+            data: stagedReportData
+        };
+
+        batch.set(reportRef, reportPayload, { merge: true });
+
+        try {
+            await batch.commit();
+            alert('Alterações salvas com sucesso!');
+        } catch (error) {
+            console.error("Error saving changes: ", error);
+            alert('Falha ao salvar. Tente novamente.');
         }
-        setReports(updatedReports);
-        alert('Alterações salvas com sucesso!');
     };
 
     const hasUnsavedChanges = useMemo(() => {
         return JSON.stringify(currentReportData) !== JSON.stringify(stagedReportData);
     }, [currentReportData, stagedReportData]);
     
-    const handleSavePreventive = (preventive: Omit<PreventiveMaintenance, 'id' | 'collaborator'>) => {
+    const handleSavePreventive = async (preventive: Omit<PreventiveMaintenance, 'id' | 'collaborator'>) => {
         if(!user) return;
-        const newPreventive: PreventiveMaintenance = {
+        const newPreventive: Omit<PreventiveMaintenance, 'id'> = {
             ...preventive,
-            id: `prev-${Date.now()}`,
             collaborator: `${user.name} (${user.email})`,
         };
-        setPreventives(prev => [newPreventive, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        await db.collection('preventives').add(newPreventive);
         addChangeLog(`Registrou nova manutenção preventiva para ${preventive.equipment}.`);
         setCurrentView(AppView.REPORT);
     };
@@ -301,7 +275,16 @@ const App: React.FC = () => {
         }
     };
     
-    const isMasterUser = user?.email === 'admin';
+    const isMasterUser = user?.email === 'admin@estapar.com.br'; // Example admin email
+
+    const toggleRegistrationLock = async (lock: boolean) => {
+        try {
+            await db.collection('settings').doc('appSettings').set({ isRegistrationLocked: lock }, { merge: true });
+        } catch (error) {
+            console.error("Failed to update registration lock status:", error);
+            alert("Não foi possível alterar o status do cadastro.");
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
@@ -319,14 +302,14 @@ const App: React.FC = () => {
                         <div className="container mx-auto px-4 py-2 flex items-center justify-center gap-4">
                             <span className="font-bold text-yellow-800">Painel do Administrador:</span>
                             <button
-                                onClick={() => setRegistrationLocked(true)}
+                                onClick={() => toggleRegistrationLock(true)}
                                 disabled={isRegistrationLocked}
                                 className="bg-red-500 text-white font-semibold py-1 px-4 rounded-md hover:bg-red-600 disabled:bg-red-300 disabled:cursor-not-allowed transition-colors text-sm"
                             >
                                 Bloquear Cadastro
                             </button>
                             <button
-                                onClick={() => setRegistrationLocked(false)}
+                                onClick={() => toggleRegistrationLock(false)}
                                 disabled={!isRegistrationLocked}
                                 className="bg-green-500 text-white font-semibold py-1 px-4 rounded-md hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors text-sm"
                             >
