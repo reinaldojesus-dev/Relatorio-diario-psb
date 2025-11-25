@@ -24,7 +24,21 @@ const createInitialReportData = (): ReportData => {
 
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
-    const [users, setUsers] = useState<User[]>([]);
+    const [users, setUsers] = useState<User[]>(() => {
+        try {
+            const storedUsers = localStorage.getItem('estapar_users');
+            const usersList: User[] = storedUsers ? JSON.parse(storedUsers) : [];
+
+            const masterUserExists = usersList.some(u => u.email === 'admin');
+            if (!masterUserExists) {
+                usersList.push({ name: 'Admin Master', email: 'admin', password: 'estaparti' });
+            }
+            return usersList;
+        } catch (error) {
+            console.error("Failed to parse users from localStorage", error);
+            return [{ name: 'Admin Master', email: 'admin', password: 'estaparti' }];
+        }
+    });
     
     const [reports, setReports] = useState<Report[]>(() => {
         try {
@@ -101,23 +115,6 @@ const App: React.FC = () => {
     useEffect(() => { localStorage.setItem('estapar_registration_locked', JSON.stringify(isRegistrationLocked)); }, [isRegistrationLocked]);
     useEffect(() => { localStorage.setItem('estapar_login_history', JSON.stringify(loginHistory)); }, [loginHistory]);
     useEffect(() => { localStorage.setItem('estapar_users', JSON.stringify(users)); }, [users]);
-
-     useEffect(() => {
-        try {
-            const storedUsers = localStorage.getItem('estapar_users');
-            let usersList: User[] = storedUsers ? JSON.parse(storedUsers) : [];
-
-            const masterUserExists = usersList.some(u => u.email === 'admin');
-            if (!masterUserExists) {
-                const masterUser: User = { name: 'Admin Master', email: 'admin', password: 'estaparti' };
-                usersList.push(masterUser);
-            }
-            setUsers(usersList);
-
-        } catch (error) {
-            console.error("Failed to parse users from localStorage", error);
-        }
-    }, []);
     
     // Sync staged data when the main data source changes (e.g., on date change)
     useEffect(() => {
