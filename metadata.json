@@ -1,0 +1,5 @@
+{
+  "name": "Relatorio TI - Estapar PSB",
+  "description": "A daily reporting tool for managers to track equipment status, log issues, and manage preventive maintenance tasks for PSB Bahia & Mercadão locations.",
+  "requestFramePermissions": []
+}
