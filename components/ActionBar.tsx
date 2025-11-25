@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { FilterIcon, WhatsAppIcon, WrenchScrewdriverIcon } from './icons';
+import { FilterIcon, WhatsAppIcon, WrenchScrewdriverIcon, SaveIcon } from './icons';
 import { AppView, ReportData } from '../types';
 import { reportStructure } from '../constants';
 
@@ -9,9 +8,11 @@ interface ActionBarProps {
     reportData: ReportData;
     reportDate: string;
     onOpenFilter: () => void;
+    onSaveChanges: () => void;
+    hasUnsavedChanges: boolean;
 }
 
-const ActionBar: React.FC<ActionBarProps> = ({ onSetView, reportData, reportDate, onOpenFilter }) => {
+const ActionBar: React.FC<ActionBarProps> = ({ onSetView, reportData, reportDate, onOpenFilter, onSaveChanges, hasUnsavedChanges }) => {
     
     const handleExportWhatsApp = () => {
         let message = `*Relatório Diário PSB Bahia & Mercadão - ${new Date(reportDate).toLocaleDateString('pt-BR')}*\n\n`;
@@ -38,6 +39,14 @@ const ActionBar: React.FC<ActionBarProps> = ({ onSetView, reportData, reportDate
     return (
         <div className="bg-white p-4 rounded-lg shadow-md mb-8 sticky top-0 z-10">
             <div className="flex flex-wrap items-center justify-center gap-4">
+                <button
+                    onClick={onSaveChanges}
+                    disabled={!hasUnsavedChanges}
+                    className="flex items-center space-x-2 bg-estapar-green text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                    <SaveIcon className="w-5 h-5" />
+                    <span>Salvar Alterações</span>
+                </button>
                 <button
                     onClick={() => onOpenFilter()}
                     className="flex items-center space-x-2 bg-blue-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-600 transition-colors"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { reportStructure } from './constants';
 import { ReportData, Report, PreventiveMaintenance, ChangeLogEntry, User, AppView, EquipmentLogEntry, ReportItemState, LoginHistoryEntry } from './types';
 import Header from './components/Header';
@@ -42,6 +42,7 @@ const App: React.FC = () => {
         { id: '1', date: new Date().toISOString(), collaborator: 'Sistema', data: createInitialReportData() }
     ]);
     const [currentReportData, setCurrentReportData] = useState<ReportData>(reports[0].data);
+    const [stagedReportData, setStagedReportData] = useState<ReportData>(reports[0].data);
     const [changeLog, setChangeLog] = useState<ChangeLogEntry[]>([]);
     const [loginHistory, setLoginHistory] = useState<LoginHistoryEntry[]>(() => {
         try {
@@ -91,6 +92,11 @@ const App: React.FC = () => {
             console.error("Failed to parse users from localStorage", error);
         }
     }, []);
+    
+    // Sync staged data when the main data source changes (e.g., on initial load or date change)
+    useEffect(() => {
+        setStagedReportData(currentReportData);
+    }, [currentReportData]);
 
     const handleLogin = (credentials: {email: string, password: string}) => {
         const foundUser = users.find(u => u.email === credentials.email && u.password === credentials.password);
@@ -156,25 +162,56 @@ const App: React.FC = () => {
             alert('Faça login com um e-mail @estapar.com.br para fazer alterações.');
             return;
         }
-        setCurrentReportData(prev => {
+        setStagedReportData(prev => {
             const newData = JSON.parse(JSON.stringify(prev));
-            newData[section][item] = { ...newData[section][item], status, observation };
+            if (!newData[section]) newData[section] = {};
+            newData[section][item] = { status, observation };
             return newData;
         });
-        const changeDescription = observation 
-            ? `Alterou ${item} em ${section} para 'Observação': ${observation}`
-            : `Alterou ${item} em ${section} para 'OK'`;
-        addChangeLog(changeDescription);
-
-        if (status === 'issue' && observation) {
-            setEquipmentLogs(prev => [{
-                id: `log-${Date.now()}`,
-                equipment: `${section} - ${item}`,
-                date: new Date().toISOString(),
-                description: observation
-            }, ...prev]);
+    }, [user]);
+    
+    const handleSaveChanges = () => {
+        if (!user) {
+            alert('Faça login para salvar as alterações.');
+            return;
         }
-    }, [user, addChangeLog]);
+        const newLogs: EquipmentLogEntry[] = [];
+
+        reportStructure.forEach(section => {
+            section.items.forEach(item => {
+                const oldState = currentReportData[section.title]?.[item] ?? { status: 'ok', observation: '' };
+                const newState = stagedReportData[section.title]?.[item] ?? { status: 'ok', observation: '' };
+
+                if (oldState.status !== newState.status || oldState.observation !== newState.observation) {
+                    const changeDescription = newState.status === 'issue' && newState.observation
+                        ? `Alterou ${item} em ${section.title} para 'Observação': "${newState.observation}"`
+                        : `Alterou ${item} em ${section.title} para 'OK'`;
+                    
+                    addChangeLog(changeDescription);
+
+                    if (newState.status === 'issue' && newState.observation && oldState.status !== 'issue') {
+                        newLogs.push({
+                            id: `log-${Date.now()}-${item}`,
+                            equipment: `${section.title} - ${item}`,
+                            date: new Date().toISOString(),
+                            description: newState.observation
+                        });
+                    }
+                }
+            });
+        });
+
+        if (newLogs.length > 0) {
+            setEquipmentLogs(prev => [...newLogs, ...prev]);
+        }
+
+        setCurrentReportData(stagedReportData);
+        alert('Alterações salvas com sucesso!');
+    };
+
+    const hasUnsavedChanges = useMemo(() => {
+        return JSON.stringify(currentReportData) !== JSON.stringify(stagedReportData);
+    }, [currentReportData, stagedReportData]);
     
     const handleSavePreventive = (preventive: Omit<PreventiveMaintenance, 'id' | 'collaborator'>) => {
         if(!user) return;
@@ -200,9 +237,11 @@ const App: React.FC = () => {
                     <>
                         <ActionBar 
                             onSetView={setCurrentView} 
-                            reportData={currentReportData} 
+                            reportData={stagedReportData} 
                             reportDate={selectedDate} 
                             onOpenFilter={() => setFilterModalOpen(true)}
+                            onSaveChanges={handleSaveChanges}
+                            hasUnsavedChanges={hasUnsavedChanges}
                         />
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4 md:p-6">
                             {reportStructure.map(section => (
@@ -210,7 +249,7 @@ const App: React.FC = () => {
                                     key={section.title}
                                     title={section.title}
                                     items={section.items}
-                                    data={currentReportData[section.title] || {}}
+                                    data={stagedReportData[section.title] || {}}
                                     onItemChange={(item, status, observation) => handleItemChange(section.title, item, status, observation)}
                                     isAuthorized={!!user}
                                 />
