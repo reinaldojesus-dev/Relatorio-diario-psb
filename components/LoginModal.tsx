@@ -5,10 +5,9 @@ interface LoginModalProps {
     onLogin: (credentials: {email: string, password: string}) => void;
     onRegister: (newUser: User) => void;
     onViewAsGuest: () => void;
-    isRegistrationLocked: boolean;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ onLogin, onRegister, onViewAsGuest, isRegistrationLocked }) => {
+const LoginModal: React.FC<LoginModalProps> = ({ onLogin, onRegister, onViewAsGuest }) => {
     const [view, setView] = useState<'login' | 'register'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -124,17 +123,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ onLogin, onRegister, onViewAsGu
                 )}
                 <div className="mt-6 border-t pt-4 text-center">
                      {view === 'login' ? (
-                        !isRegistrationLocked ? (
-                            <button
-                                type="button"
-                                onClick={() => setView('register')}
-                                className="text-blue-600 hover:underline font-semibold"
-                            >
-                                Não tem uma conta? Cadastre-se
-                            </button>
-                        ) : (
-                            <p className="text-sm text-red-600 font-semibold">O cadastro de novos usuários está bloqueado.</p>
-                        )
+                        <button
+                            type="button"
+                            onClick={() => setView('register')}
+                            className="text-blue-600 hover:underline font-semibold"
+                        >
+                            Não tem uma conta? Cadastre-se
+                        </button>
                     ) : (
                         <button
                             type="button"

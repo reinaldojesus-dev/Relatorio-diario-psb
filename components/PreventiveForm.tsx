@@ -3,7 +3,7 @@ import { allEquipment } from '../constants';
 import { PreventiveMaintenance } from '../types';
 
 interface PreventiveFormProps {
-    onSave: (preventive: Omit<PreventiveMaintenance, 'id' | 'collaborator'>) => void;
+    onSave: (preventive: Omit<PreventiveMaintenance, 'id' | 'collaborator' | 'photo'>, photo: string) => void;
     onCancel: () => void;
 }
 
@@ -11,16 +11,13 @@ const PreventiveForm: React.FC<PreventiveFormProps> = ({ onSave, onCancel }) => 
     const [equipment, setEquipment] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [photo, setPhoto] = useState<string>('');
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                const base64String = reader.result as string;
-                setPhoto(base64String);
-                setPhotoPreview(base64String);
+                setPhoto(reader.result as string);
             };
             reader.readAsDataURL(file);
         }
@@ -29,10 +26,10 @@ const PreventiveForm: React.FC<PreventiveFormProps> = ({ onSave, onCancel }) => 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!equipment || !date || !photo) {
-            alert('Por favor, preencha todos os campos.');
+            alert('Por favor, preencha todos os campos e selecione uma foto.');
             return;
         }
-        onSave({ equipment, date, photo });
+        onSave({ equipment, date }, photo);
     };
 
     return (
@@ -78,7 +75,7 @@ const PreventiveForm: React.FC<PreventiveFormProps> = ({ onSave, onCancel }) => 
                                    hover:file:bg-green-700"
                         required
                     />
-                    {photoPreview && <img src={photoPreview} alt="Preview" className="mt-4 rounded-md shadow-sm max-h-60" />}
+                    {photo && <img src={photo} alt="Preview" className="mt-4 rounded-md shadow-sm max-h-60" />}
                 </div>
                 <div className="flex justify-end space-x-4 pt-4">
                     <button type="button" onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-md hover:bg-gray-300 transition-colors">
